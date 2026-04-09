@@ -26,12 +26,6 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Copy manifests to server
-        run: |
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p ~/immo-mcp/k8s"
-          scp k8s/mcp-server.yaml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/immo-mcp/k8s/
-          scp k8s/fastapi-app.yaml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/immo-mcp/k8s/
-
       - name: Create inventory
         run: |
           mkdir -p ansible
@@ -39,6 +33,13 @@ jobs:
           [production]
           server ansible_host=${{ secrets.SERVER_HOST }} ansible_user=${{ secrets.SERVER_USER }}
           EOF
+
+      - name: Copy manifests to server
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p ~/immo-mcp/k8s"
+          scp k8s/mcp-server.yaml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/immo-mcp/k8s/
+          scp k8s/fastapi-app.yaml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/immo-mcp/k8s/
+
       - name: Run Ansible
         run: >
           ansible-playbook ansible_playbook.yml
@@ -48,5 +49,3 @@ jobs:
           -e "image_prefix=${{ secrets.GHCR_USER }}/immo-mcp"
           -e "mistral_api_key=${{ secrets.MISTRAL_API_KEY }}"
           -e "gemini_api_key=${{ secrets.GEMINI_API_KEY }}"
-        env:
-          ANSIBLE_HOST_KEY_CHECKING: "false"
