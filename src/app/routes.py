@@ -6,9 +6,10 @@ from src.app.monitoring.prometheus_metrics import track_inference_time
 from langchain_core.runnables import RunnableConfig
 import json
 import time
-
+from config_agent import llm_mistral, MCP_URL
 from pydantic import BaseModel
-
+from src.agents.clientMCP import create_client
+from src.agents.agentMCP import create_agent
 class Message(BaseModel):
     role: str
     content: str
@@ -24,6 +25,25 @@ config = RunnableConfig(metadata={"timeout": 5*60})
 
 #session = rt.InferenceSession(str(DEPLOYED_MODEL_PATH))
 #input_names = session.get_inputs()
+
+async def get_agent(request: Request):
+    """Lazy MCP connection — connects on first use."""
+    app = request.app
+    if app.state.agent is not None:
+        return app.state.agent
+
+    async with app.state._mcp_lock:
+        # Double-check after acquiring lock
+        if app.state.agent is not None:
+            return app.state.agent
+
+        client = await create_client(MCP_URL)
+        tools = await client.get_tools()
+        app.state.mcp_client = client
+        app.state.mcp_tools = {t.name: t for t in tools}
+        app.state.agent = await create_agent(tools=tools, llm=llm_mistral)
+        return app.state.agent
+
 
 
 @router.get("/", tags=["Home"], response_class=HTMLResponse)
@@ -48,7 +68,10 @@ async def predict(
     address_type: Optional[str] = Form(None),
     ):
     print(type_local, address, surface_habitable, nombre_pieces, surface_terrain, latitude, longitude, address_type)
-    
+    try:
+        await get_agent(request)
+    except Exception:
+        raise JSONResponse({"error" : "Error 503 : MCP server unavailable"})
     try:
         tool = request.app.state.mcp_tools["estimation_tools"]
         inference_start=time.time()
@@ -81,7 +104,11 @@ async def chatbot(request: Request):
 
 @router.post("/chat", tags=["Chat"], response_class=JSONResponse)
 async def chatbot(request: Request, body: ChatRequest):
-    response = await request.app.state.agent.ainvoke(
+    try:
+        agent = await get_agent(request)
+    except Exception:
+        raise JSONResponse({"error" : "Error 503 : MCP server unavailable"})
+    response = await agent.ainvoke(
         {"messages": [(m.role, m.content) for m in body.messages]},
         config =config
     )
@@ -90,8 +117,12 @@ async def chatbot(request: Request, body: ChatRequest):
 
 @router.post("/chat/stream", tags=["Chat"])
 async def chatbot(request: Request, body: ChatRequest):
+    try:
+        agent = await get_agent(request)
+    except Exception:
+        raise JSONResponse({"error" : "Error 503 : MCP server unavailable"})
     async def generate():
-        async for event in request.app.state.agent.astream_events(
+        async for event in agent.astream_events(
             {"messages": [(m.role, m.content) for m in body.messages]},
             config=config,
             version="v2",
