@@ -1,4 +1,5 @@
 - hosts: production
+  gather_facts: false
   tasks:
     - name: Create GHCR pull secret
       shell: |
