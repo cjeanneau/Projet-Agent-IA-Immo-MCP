@@ -35,6 +35,6 @@ jobs:
           EOF
 
       - name: Run Ansible
-        run: ansible-playbook ansible/playbook.yml -i ansible/inventory.ini
+        run: ansible-playbook ansible_playbook.yml -i ansible/inventory.ini
         env:
           ANSIBLE_HOST_KEY_CHECKING: "false"
