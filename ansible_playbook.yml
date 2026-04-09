@@ -1,5 +1,4 @@
 - hosts: production
-  become: true
   tasks:
     - name: Create GHCR pull secret
       shell: |
