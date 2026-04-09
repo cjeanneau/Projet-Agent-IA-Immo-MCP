@@ -57,4 +57,3 @@ spec:
   ports:
     - port: 8100
       targetPort: 8100
-      nodePort: __NODE_PORT__
