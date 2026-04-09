@@ -1,27 +1,30 @@
-- name: Create GHCR pull secret
-  shell: |
-    k3s kubectl create secret docker-registry ghcr-secret \
-      --docker-server=ghcr.io \
-      --docker-username={{ ghcr_user }} \
-      --docker-password={{ ghcr_token }} \
-      --dry-run=client -o yaml | k3s kubectl apply -f -
+- hosts: production
+  become: true
+  tasks:
+    - name: Create GHCR pull secret
+      shell: |
+        k3s kubectl create secret docker-registry ghcr-secret \
+          --docker-server=ghcr.io \
+          --docker-username={{ ghcr_user }} \
+          --docker-password={{ ghcr_token }} \
+          --dry-run=client -o yaml | k3s kubectl apply -f -
 
-- name: Apply MCP manifest
-  shell: |
-    sed -e "s|__PROJECT_ROOT__|/opt/immo-mcp|g" \
-        -e "s|__MCP_IMAGE__|ghcr.io/{{ image_prefix }}-server:latest|g" \
-        -e "s|__PULL_POLICY__|Always|g" \
-        -e 's|__IMAGE_PULL_SECRETS__|imagePullSecrets:\n        - name: ghcr-secret|g' \
-        /opt/immo-mcp/k8s/mcp-server.yaml | k3s kubectl apply -f -
+    - name: Apply MCP manifest
+      shell: |
+        sed -e "s|__PROJECT_ROOT__|/opt/immo-mcp|g" \
+            -e "s|__MCP_IMAGE__|ghcr.io/{{ image_prefix }}-server:latest|g" \
+            -e "s|__PULL_POLICY__|Always|g" \
+            -e 's|__IMAGE_PULL_SECRETS__|imagePullSecrets:\n        - name: ghcr-secret|g' \
+            /opt/immo-mcp/k8s/mcp-server.yaml | k3s kubectl apply -f -
 
-- name: Apply FastAPI manifest
-  shell: |
-    sed -e "s|__API_IMAGE__|ghcr.io/{{ image_prefix }}-api:latest|g" \
-        -e "s|__PULL_POLICY__|Always|g" \
-        -e 's|__IMAGE_PULL_SECRETS__|imagePullSecrets:\n        - name: ghcr-secret|g' \
-        /opt/immo-mcp/k8s/fastapi-app.yaml | k3s kubectl apply -f -
+    - name: Apply FastAPI manifest
+      shell: |
+        sed -e "s|__API_IMAGE__|ghcr.io/{{ image_prefix }}-api:latest|g" \
+            -e "s|__PULL_POLICY__|Always|g" \
+            -e 's|__IMAGE_PULL_SECRETS__|imagePullSecrets:\n        - name: ghcr-secret|g' \
+            /opt/immo-mcp/k8s/fastapi-app.yaml | k3s kubectl apply -f -
 
-- name: Restart deployments
-  shell: |
-    k3s kubectl rollout restart deployment mcp-server
-    k3s kubectl rollout restart deployment fastapi-app
+    - name: Restart deployments
+      shell: |
+        k3s kubectl rollout restart deployment mcp-server
+        k3s kubectl rollout restart deployment fastapi-app
