@@ -1,3 +1,4 @@
+# k8s/mcp-server.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,10 +13,11 @@ spec:
       labels:
         app: mcp-server
     spec:
+      __IMAGE_PULL_SECRETS__
       containers:
         - name: mcp-server
-          image: mcp-server:latest
-          imagePullPolicy: Never
+          image: __MCP_IMAGE__
+          imagePullPolicy: __PULL_POLICY__
           ports:
             - containerPort: 8100
           env:
@@ -29,7 +31,6 @@ spec:
           volumeMounts:
             - name: db
               mountPath: /app/data
-              readOnly: true
             - name: model
               mountPath: /app/model/deploy
               readOnly: true

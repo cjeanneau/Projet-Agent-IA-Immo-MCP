@@ -1,0 +1,38 @@
+# .github/workflows/deploy.yml
+name: Deploy to K3S
+
+on:
+  workflow_run:
+    workflows: ["Build and Push Images"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: pip install ansible
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create inventory
+        run: |
+          cat > ansible/inventory.ini << EOF
+          [production]
+          server ansible_host=${{ secrets.SERVER_HOST }} ansible_user=${{ secrets.SERVER_USER }}
+          EOF
+
+      - name: Run Ansible
+        run: ansible-playbook ansible/playbook.yml -i ansible/inventory.ini
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "false"
