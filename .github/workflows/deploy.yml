@@ -49,3 +49,4 @@ jobs:
           -e "image_prefix=${{ secrets.GHCR_USER }}/immo-mcp"
           -e "mistral_api_key=${{ secrets.MISTRAL_API_KEY }}"
           -e "gemini_api_key=${{ secrets.GEMINI_API_KEY }}"
+          -e "langsmith_api_key=${{ secrets.LANGSMITH_API_KEY }}"
