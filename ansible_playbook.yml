@@ -1,51 +1,27 @@
----
-- name: Déployer mon application Docker en local
-  hosts: servers
-  become: no  # Exécute les tâches avec UID=100
+- name: Create GHCR pull secret
+  shell: |
+    k3s kubectl create secret docker-registry ghcr-secret \
+      --docker-server=ghcr.io \
+      --docker-username={{ ghcr_user }} \
+      --docker-password={{ ghcr_token }} \
+      --dry-run=client -o yaml | k3s kubectl apply -f -
 
-  tasks:
-    - name: Ajouter l'utilisateur au groupe docker
-      user:
-        name: "{{ ansible_user_id }}"
-        groups: docker
-        append: yes
+- name: Apply MCP manifest
+  shell: |
+    sed -e "s|__PROJECT_ROOT__|/opt/immo-mcp|g" \
+        -e "s|__MCP_IMAGE__|ghcr.io/{{ image_prefix }}-server:latest|g" \
+        -e "s|__PULL_POLICY__|Always|g" \
+        -e 's|__IMAGE_PULL_SECRETS__|imagePullSecrets:\n        - name: ghcr-secret|g' \
+        /opt/immo-mcp/k8s/mcp-server.yaml | k3s kubectl apply -f -
 
-    - name: Se connecter à GHCR (si ton dépôt est privé)
-      community.docker.docker_login:
-        registry: ghcr.io
-        username: "{{ lookup('env', 'GHCR_USER') }}"
-        password: "{{ lookup('env', 'GHCR_TOKEN') }}"
-      no_log: true
+- name: Apply FastAPI manifest
+  shell: |
+    sed -e "s|__API_IMAGE__|ghcr.io/{{ image_prefix }}-api:latest|g" \
+        -e "s|__PULL_POLICY__|Always|g" \
+        -e 's|__IMAGE_PULL_SECRETS__|imagePullSecrets:\n        - name: ghcr-secret|g' \
+        /opt/immo-mcp/k8s/fastapi-app.yaml | k3s kubectl apply -f -
 
-    - name: Arrêter le conteneur s'il est démarré
-      community.docker.docker_container:
-        name: grp2-projet-immo
-        state: stopped
-      ignore_errors: yes
-
-    - name: Supprimer le conteneur
-      community.docker.docker_container:
-        name: grp2-projet-immo
-        state: absent
-
-    - name: Pull la dernière image
-      community.docker.docker_image:
-        name: ghcr.io/{{ lookup('env', 'GHCR_USER') | lower }}/projet-immo:latest
-        source: pull
-        force_source: yes  # Force le téléchargement même si l'image existe
-
-    - name: Remove dangling images
-      community.docker.docker_prune:
-        images: true
-        images_filters:
-          dangling: true
-
-    - name: Lancer un nouveau conteneur
-      community.docker.docker_container:
-        name: grp2-projet-immo
-        image: ghcr.io/{{ lookup('env', 'GHCR_USER') | lower }}/projet-immo:latest
-        ports: "5002:8000"
-        state: started
-        restart_policy: unless-stopped
-        networks:
-          - name: p4_network
+- name: Restart deployments
+  shell: |
+    k3s kubectl rollout restart deployment mcp-server
+    k3s kubectl rollout restart deployment fastapi-app
