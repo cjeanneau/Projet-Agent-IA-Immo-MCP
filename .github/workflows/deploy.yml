@@ -33,8 +33,12 @@ jobs:
           [production]
           server ansible_host=${{ secrets.SERVER_HOST }} ansible_user=${{ secrets.SERVER_USER }}
           EOF
-
       - name: Run Ansible
-        run: ansible-playbook ansible_playbook.yml -i ansible/inventory.ini
+        run: >
+          ansible-playbook ansible_playbook.yml
+          -i ansible/inventory.ini
+          -e "ghcr_user=${{ secrets.GHCR_USER }}"
+          -e "ghcr_token=${{ secrets.GHCR_TOKEN }}"
+          -e "image_prefix=${{ secrets.GHCR_USER }}/immo-mcp"
         env:
           ANSIBLE_HOST_KEY_CHECKING: "false"
