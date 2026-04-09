@@ -1,3 +1,4 @@
+# k8s/fastapi-app.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,10 +13,11 @@ spec:
       labels:
         app: fastapi-app
     spec:
+      __IMAGE_PULL_SECRETS__
       containers:
         - name: fastapi-app
-          image: fastapi-app:latest
-          imagePullPolicy: Never
+          image: __API_IMAGE__
+          imagePullPolicy: __PULL_POLICY__
           ports:
             - containerPort: 8000
           env:
