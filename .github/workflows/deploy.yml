@@ -25,12 +25,12 @@ jobs:
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-          
+
       - name: Copy manifests to server
         run: |
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p /opt/immo-mcp/k8s"
-          scp k8s/mcp-server.yaml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/opt/immo-mcp/k8s/
-          scp k8s/fastapi-app.yaml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/opt/immo-mcp/k8s/
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "mkdir -p ~/immo-mcp/k8s"
+          scp k8s/mcp-server.yaml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/immo-mcp/k8s/
+          scp k8s/fastapi-app.yaml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/immo-mcp/k8s/
 
       - name: Create inventory
         run: |

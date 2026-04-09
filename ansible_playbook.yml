@@ -11,18 +11,18 @@
 
     - name: Apply MCP manifest
       raw: |
-        sed -e "s|__PROJECT_ROOT__|/opt/immo-mcp|g" \
+        sed -e "s|__PROJECT_ROOT__|$HOME/immo-mcp|g" \
             -e "s|__MCP_IMAGE__|ghcr.io/{{ image_prefix }}-server:latest|g" \
             -e "s|__PULL_POLICY__|Always|g" \
             -e 's|__IMAGE_PULL_SECRETS__|imagePullSecrets:\n        - name: ghcr-secret|g' \
-            /opt/immo-mcp/k8s/mcp-server.yaml | k3s kubectl apply -f -
+            $HOME/immo-mcp/k8s/mcp-server.yaml | k3s kubectl apply -f -
 
     - name: Apply FastAPI manifest
       raw: |
         sed -e "s|__API_IMAGE__|ghcr.io/{{ image_prefix }}-api:latest|g" \
             -e "s|__PULL_POLICY__|Always|g" \
             -e 's|__IMAGE_PULL_SECRETS__|imagePullSecrets:\n        - name: ghcr-secret|g' \
-            /opt/immo-mcp/k8s/fastapi-app.yaml | k3s kubectl apply -f -
+            $HOME/immo-mcp/k8s/fastapi-app.yaml | k3s kubectl apply -f -
 
     - name: Restart deployments
       raw: |
