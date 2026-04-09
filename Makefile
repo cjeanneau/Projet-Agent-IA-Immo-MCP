@@ -59,3 +59,6 @@ k3s-secrets:
 		--dry-run=client -o yaml > /tmp/k3s-secret.yaml
 	sudo k3s kubectl apply -f /tmp/k3s-secret.yaml
 	rm -f /tmp/k3s-secret.yaml
+
+dump-artifacts:
+	./scripts/deploy/artifacts.sh p4g1@datalab.myconnectech.fr
