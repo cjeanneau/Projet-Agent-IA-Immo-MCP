@@ -20,6 +20,7 @@
           --namespace=p4g1 \
           --from-literal=MISTRAL_API_KEY={{ mistral_api_key }} \
           --from-literal=GEMINI_API_KEY={{ gemini_api_key }} \
+          --from-literal=LANGSMITH_API_KEY={{ langsmith_api_key }} \
           --dry-run=client -o yaml | k3s kubectl apply -f -
 
     - name: Patch default service account with pull secret

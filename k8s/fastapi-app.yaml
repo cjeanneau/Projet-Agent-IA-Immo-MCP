@@ -24,6 +24,12 @@ spec:
           env:
             - name: MCP_URL
               value: "http://mcp-server:8100/mcp"
+            - name: LANGSMITH_TRACING
+              value: "true"
+            - name: LANGSMITH_ENDPOINT
+              value: "https://eu.api.smith.langchain.com"
+            - name: LANGSMITH_PROJECT
+              value: "k3s-p4g1"
           envFrom:
             - secretRef:
                 name: api-keys
