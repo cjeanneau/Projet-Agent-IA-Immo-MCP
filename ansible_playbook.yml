@@ -1,12 +1,24 @@
 - hosts: production
   gather_facts: false
   tasks:
+    - name: Create namespace
+      raw: k3s kubectl create namespace p4g1 --dry-run=client -o yaml | k3s kubectl apply -f -
+
     - name: Create GHCR pull secret
       raw: |
         k3s kubectl create secret docker-registry ghcr-secret \
+          --namespace=p4g1 \
           --docker-server=ghcr.io \
           --docker-username={{ ghcr_user }} \
           --docker-password={{ ghcr_token }} \
+          --dry-run=client -o yaml | k3s kubectl apply -f -
+
+    - name: Create API keys secret
+      raw: |
+        k3s kubectl create secret generic api-keys \
+          --namespace=p4g1 \
+          --from-literal=MISTRAL_API_KEY={{ mistral_api_key }} \
+          --from-literal=GEMINI_API_KEY={{ gemini_api_key }} \
           --dry-run=client -o yaml | k3s kubectl apply -f -
 
     - name: Apply MCP manifest
@@ -14,6 +26,8 @@
         sed -e "s|__PROJECT_ROOT__|$HOME/immo-mcp|g" \
             -e "s|__MCP_IMAGE__|ghcr.io/{{ image_prefix }}-server:latest|g" \
             -e "s|__PULL_POLICY__|Always|g" \
+            -e "s|__NAMESPACE__|p4g1|g" \
+            -e "s|__NODE_PORT__|31080|g" \
             -e 's|__IMAGE_PULL_SECRETS__|imagePullSecrets:\n        - name: ghcr-secret|g' \
             $HOME/immo-mcp/k8s/mcp-server.yaml | k3s kubectl apply -f -
 
@@ -21,10 +35,12 @@
       raw: |
         sed -e "s|__API_IMAGE__|ghcr.io/{{ image_prefix }}-api:latest|g" \
             -e "s|__PULL_POLICY__|Always|g" \
+            -e "s|__NAMESPACE__|p4g1|g" \
+            -e "s|__NODE_PORT__|31080|g" \
             -e 's|__IMAGE_PULL_SECRETS__|imagePullSecrets:\n        - name: ghcr-secret|g' \
             $HOME/immo-mcp/k8s/fastapi-app.yaml | k3s kubectl apply -f -
 
     - name: Restart deployments
       raw: |
-        k3s kubectl rollout restart deployment mcp-server
-        k3s kubectl rollout restart deployment fastapi-app
+        k3s kubectl -n p4g1 rollout restart deployment mcp-server
+        k3s kubectl -n p4g1 rollout restart deployment fastapi-app
