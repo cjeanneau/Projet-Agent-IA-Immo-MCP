@@ -17,7 +17,7 @@ class TypeBien(str, Enum):
     maison = "maison"
     appartement = "appartement"
 
-con = duckdb.connect(BPE_INSEE_DB)
+con = duckdb.connect(BPE_INSEE_DB, read_only=True)
 
 #Initialisation du serveur MCP avec les outils disponibles
 mcp = FastMCP(

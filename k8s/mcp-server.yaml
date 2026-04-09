@@ -18,9 +18,30 @@ spec:
           imagePullPolicy: Never
           ports:
             - containerPort: 8100
+          env:
+            - name: BPE_INSEE
+              value: "/app/data/bpe_insee.duckdb"
+            - name: MODEL
+              value: "/app/model/deploy/best_model3.pkl"
           envFrom:
             - secretRef:
                 name: api-keys
+          volumeMounts:
+            - name: db
+              mountPath: /app/data
+              readOnly: true
+            - name: model
+              mountPath: /app/model/deploy
+              readOnly: true
+      volumes:
+        - name: db
+          hostPath:
+            path: __PROJECT_ROOT__/data
+            type: Directory
+        - name: model
+          hostPath:
+            path: __PROJECT_ROOT__/model/deploy
+            type: Directory
 ---
 apiVersion: v1
 kind: Service
