@@ -21,11 +21,11 @@ RUN uv pip install --system --no-cache .
 # Copy application code
 COPY config.py ./
 COPY config_agent.py ./
-COPY data/bpe_insee.duckdb ./data/bpe_insee.duckdb
+#COPY data/bpe_insee.duckdb ./data/bpe_insee.duckdb
 COPY src/ ./src/
 
 # Copy model files
-COPY ./model/ ./model
+#COPY ./model/ ./model
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app

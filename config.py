@@ -1,6 +1,7 @@
 from pathlib import Path
-
-
+from dotenv import load_dotenv
+import os
+load_dotenv(override=True)
 
 # Projecty root directory
 ROOT = Path(__file__).parent
@@ -23,7 +24,7 @@ DVF = DATA_DIR / "valeursfoncieres-2025-s1.txt.zip"
 BPE_INSEE = DATA_DIR / "BPE_INSEE"
 
 # DuckDB
-BPE_INSEE_DB = DATA_DIR / "bpe_insee.duckdb"
+BPE_INSEE_DB = os.getenv("BPE_INSEE", str(DATA_DIR / "bpe_insee.duckdb"))
 
 # Token database
 TOKENDB = DATA_DIR / "tokendb.json"
@@ -35,5 +36,5 @@ API_CONFIG = {
 
 # Model 
 MODEL_DIR = ROOT  / 'model'
-MODEL = MODEL_DIR / 'deploy' / 'best_model3.pkl'
+MODEL = os.getenv('MODEL', str(MODEL_DIR / 'deploy' / 'best_model3.pkl'))
 

@@ -48,7 +48,10 @@ k3s:
 	docker save fastapi-app:latest | sudo k3s ctr images import -
 
 deploy:
-	sudo k3s kubectl apply -f k8s/
+	sed "s|__PROJECT_ROOT__|$(CURDIR)|g" k8s/mcp-server.yaml | sudo k3s kubectl apply -f -
+	sudo k3s kubectl apply -f k8s/fastapi-app.yaml
+	sudo k3s kubectl rollout restart deployment mcp-server
+	sudo k3s kubectl rollout restart deployment fastapi-app
 
 k3s-secrets:
 	sudo k3s kubectl create secret generic api-keys \
