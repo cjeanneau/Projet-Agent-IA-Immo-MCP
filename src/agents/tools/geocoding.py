@@ -1,8 +1,8 @@
 import aiohttp
 from src.agents.tools.list_transactions import get_session
+from typing import Any
 
-
-async def geocoding(address: str) -> dict[str, float]:
+async def geocoding(address: str) -> dict[str, Any]:
     """Obtenir les coordonnées géographiques pour une adresse donnée."""
     if not address or len(address) < 5:
         raise ValueError("Adresse invalide. Veuillez fournir une adresse complète.")

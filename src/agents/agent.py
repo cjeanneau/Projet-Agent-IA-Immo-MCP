@@ -107,7 +107,7 @@ async def estimation_tools(
         return {"error": f"Estimation échouée: {type(e).__name__}: {e}"}
 
 
-llm_mistral = ChatMistralAI(model="mistral-small-latest", api_key=api_key_mistral, temperature=0)
+llm_mistral = ChatMistralAI(model="mistral-small-2503", api_key=api_key_mistral, temperature=0)
 llm_gemini = ChatGoogleGenerativeAI(model="gemini-2.5-flash", api_key=api_key_gemini, temperature=0)
 
 agent = create_agent(

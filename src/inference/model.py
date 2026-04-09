@@ -2,7 +2,7 @@ from src.utils.geo import validate_and_geocode_address
 from src.utils.load_models import load_pickle
 from config import MODEL
 import numpy as np
-from typing import Dict
+from typing import Dict, Any
 from pathlib import Path
 import pandas as pd
 
@@ -33,7 +33,7 @@ def get_estimation(
         surface_habitable : float,
         surface_terrain : float,
         nombre_pieces : int,
-    ) -> Dict[str, float] : 
+    ) -> Dict[str, Any] : 
 
     is_valid , geocode_data = validate_and_geocode_address(address)
 
@@ -74,8 +74,8 @@ def get_estimation(
             "price": prediction,
             "price_per_m2": int(prediction / surface_habitable),
             "confidence_interval": {
-                "min": prediction - confidence_margin,
-                "max": prediction + confidence_margin
+                "min": float(prediction - confidence_margin),
+                "max": float(prediction + confidence_margin)
             },
             "confidence_level": "high" if geocode_data.get('type') == "housenumber" else "medium"
         },
@@ -88,8 +88,8 @@ def get_estimation(
 
 def model_predict(model, model_input):
 
-    return np.exp(
+    return float(np.exp(
         model.predict(
             pd.DataFrame(model_input, index=[0])
         )[0]
-    )
+    ))
