@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fastapi-app
+  template:
+    metadata:
+      labels:
+        app: fastapi-app
+    spec:
+      containers:
+        - name: fastapi-app
+          image: fastapi-app:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          env:
+            - name: MCP_URL
+              value: "http://mcp-server:8100/mcp"
+          envFrom:
+            - secretRef:
+                name: api-keys
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi-app
+spec:
+  type: NodePort
+  selector:
+    app: fastapi-app
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30080
