@@ -1,4 +1,4 @@
-.PHONY: agent help
+.PHONY: agent help ingest
 SHELL := /bin/bash
 
 help: ## Affiche cette aide
@@ -25,6 +25,10 @@ test: ## Lance les tests
 
 coverage-report: ## Affiche le rapport de couverture
 	coverage report -m
+
+ingest: ## Génère un digest du repo pour la branche courante
+	@mkdir -p docs/ingest
+	uv run gitingest -b $$(git branch --show-current) -o docs/ingest/digest.txt .
 
 # ============================================
 # Docker
