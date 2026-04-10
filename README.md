@@ -1,46 +1,67 @@
 # Projet Immo - Prédiction de Prix Immobiliers
 
-Application de prédiction du prix de biens immobiliers basée sur l'apprentissage automatique.
+Application de prédiction du prix de biens immobiliers basée sur l'apprentissage automatique et un agent IA conversationnel.
 
 ## Description
 
-Ce projet vise à mettre à disposition une application permettant d'estimer le prix d'un bien immobilier en fonction de ses caractéristiques (localisation, surface, nombre de pièces, etc.).
+Ce projet met à disposition une application permettant d'estimer le prix d'un bien immobilier en fonction de ses caractéristiques (localisation, surface, nombre de pièces, etc.). Il repose sur une architecture à deux services : une API FastAPI pour l'interface utilisateur et un serveur MCP (Model Context Protocol) exposant les outils métier (geocoding, transactions, estimation, équipements).
 
 ## Fonctionnalités
 
-- Prédiction du prix d'un bien immobilier
-- Interface utilisateur pour saisir les caractéristiques du bien
-- Modèle d'apprentissage automatique entraîné sur des données réelles
-- API REST pour l'intégration dans d'autres applications
-- Chatbot intelligent pour l'assistance utilisateur
+- Prédiction du prix d'un bien immobilier via un modèle XGBoost/Scikit-learn
+- Interface web pour saisir les caractéristiques du bien
+- Chatbot intelligent (Mistral AI) avec streaming pour l'assistance utilisateur
+- Consultation des transactions immobilières récentes (API DVF+ Cerema)
+- Consultation des équipements communaux (BPE INSEE via DuckDB)
+- Geocoding d'adresses (geo.api.gouv.fr)
+- Monitoring Prometheus + Grafana
 
-## Architecture du Projet
+## Architecture
+
+Le projet suit une architecture microservices avec deux applications distinctes :
 
 ```mermaid
 graph TD
-    A[Utilisateur] -->|Interface Web| B[FastAPI]
-    A -->|Requêtes API| B
-    B -->|Prédiction| C[Modèle ML]
-    B -->|Chatbot| D[Agent IA]
-    C -->|Données| E[Base de Données]
-    D -->|Outils| F[Geocoding]
-    D -->|Outils| G[Transactions]
-    D -->|Outils| H[Estimation]
-    D -->|Outils| I[Équipements]
-    I -->|BDD| J[DuckDB]
+    U[Utilisateur] -->|Interface Web / API| FA[FastAPI :8000]
+    FA -->|MCP Protocol| MCP[Serveur MCP :8100]
+    FA -->|LangChain Agent| LLM[Mistral AI]
+    MCP -->|geocoding_tools| GEO[geo.api.gouv.fr]
+    MCP -->|recent_transactions_tools| DVF[API DVF+ Cerema]
+    MCP -->|estimation_tools| MODEL[Modèle ML XGBoost]
+    MCP -->|commune_info_tools| DB[(DuckDB BPE INSEE)]
+    DVF -->|cache| CACHE[diskcache 30j]
 ```
 
-## Technologies utilisées
+### Applications
 
-- **Python** : Langage principal
-- **Scikit-learn / XGBoost** : Modèles de machine learning
-- **FastAPI** : Framework API REST
-- **Pandas** : Manipulation des données
-- **Docker** : Conteneurisation
-- **MLflow** : Gestion du cycle de vie des modèles
-- **LangChain** : Framework pour agents IA
-- **LangSmith** : Monitoring d'agents IA
-- **Mistral AI / Gemini** : Modèles de langage pour le chatbot
+| Service | Port | Description |
+|---------|------|-------------|
+| **FastAPI** | 8000 | API REST, interface web, chatbot, agent LangChain |
+| **MCP Server** | 8100 | Outils métier : geocoding, transactions, estimation, équipements |
+
+### Outils MCP
+
+1. **geocoding_tools** : Conversion d'adresse en coordonnées GPS et code INSEE
+2. **commune_info_tools** : Équipements de la commune (BPE INSEE)
+3. **recent_transactions_tools** : Ventes immobilières récentes (API Cerema, cache disque 30 jours)
+4. **estimation_tools** : Prédiction de prix (modèle XGBoost sérialisé)
+
+## Technologies
+
+- **Python 3.12** / **uv** : Gestion des dépendances
+- **FastAPI** / **Uvicorn** : API REST et interface web
+- **FastMCP** : Serveur MCP pour les outils métier
+- **LangChain** / **Mistral AI** : Agent IA conversationnel
+- **Scikit-learn** / **XGBoost** : Modèle de prédiction
+- **DuckDB** : Base de données équipements INSEE
+- **Prometheus** / **Grafana** : Monitoring
+- **Docker** : Conteneurisation (multi-stage builds, groupes de dépendances)
+- **K3S** : Orchestration Kubernetes
+- **Ansible** : Déploiement automatisé
+- **GitHub Actions** : CI/CD (tests, build, deploy)
+- **DVC** : Versioning des données
+- **MLflow** / **Optuna** : Entraînement et optimisation des modèles
+- **LangSmith** : Monitoring de l'agent IA
 
 ## Installation
 
@@ -49,23 +70,33 @@ graph TD
 - Python 3.12+
 - uv
 - make
-- construire un .env en suivant le .env.exemple
+- Un fichier `.env` (suivre `.env.exemple`)
 
 ### Étapes
 
 ```bash
 # Cloner le dépôt
-git clone https://github.com/VestiC1/Projet-Agent-IA-Immo.git
-cd Projet-Agent-IA-Immo
+git clone https://github.com/cjeanneau/Projet-Agent-IA-Immo-MCP.git
+cd Projet-Agent-IA-Immo-MCP
 
-# Installer les dépendances
-uv sync
+# Installer toutes les dépendances
+uv sync --all-groups
 
-# Activer un environnement virtuel
-source .venv/bin/activate  # Sur Windows: .venv\Scripts\activate
+# Ou installer uniquement pour un service
+uv sync --group fastapi   # API uniquement
+uv sync --group mcp       # MCP uniquement
 ```
 
 ## Utilisation
+
+### Lancer les services localement
+
+```bash
+make fastapi    # Lance l'API FastAPI sur :8000
+make fastmcp    # Lance le serveur MCP sur :8100
+```
+
+L'interface web est accessible à `http://localhost:8000` et la documentation API à `http://localhost:8000/docs`.
 
 ### Entraîner un modèle
 
@@ -73,82 +104,117 @@ source .venv/bin/activate  # Sur Windows: .venv\Scripts\activate
 python -m scripts.model_training_mlflow
 ```
 
-### Lancer l'API
+### Lancer les tests
 
 ```bash
-make fastapi
+make test
+make coverage-report
 ```
 
-L'API sera accessible à l'adresse `http://localhost:8222`
+## Déploiement
 
-### Documentation de l'API
+### Docker
 
-La documentation interactive est disponible à `http://localhost:8222/docs`
-
-## Déploiement avec Docker
-
-### Construire l'image Docker
+Les Dockerfiles utilisent des builds multi-stage et des groupes de dépendances uv pour des images optimisées :
 
 ```bash
-# Construire l'image
-make build
+# Construire les images
+make build       # Image FastAPI (~330 MB)
+make build-mcp   # Image MCP (~1.25 GB)
+
+# Lancer les conteneurs
+make run         # Lance FastAPI
+make run-mcp     # Lance MCP
 ```
 
-### Exécuter le conteneur
+### K3S (Kubernetes)
 
 ```bash
-# Lancer le conteneur
-make run
+# Importer les images dans k3s
+make k3s
+
+# Créer les secrets
+make k3s-secrets
+
+# Déployer les manifests
+make deploy
 ```
 
-### Arrêter le conteneur
+### CI/CD (GitHub Actions)
 
-```bash
-# Arrêter le conteneur
-make stop
-```
+- **tests.yml** : Tests automatiques sur push `main` et `staging`
+- **build.yml** : Build et push des images Docker vers GHCR sur push `main`
+- **deploy.yml** : Déploiement automatique sur K3S via Ansible après un build réussi
 
 ## Structure du projet
 
 ```
-Projet-immo/
-├── data/               # Données brutes et traitées
-├── docs/               # Documentation
-├── model/             # Modèles entraînés
-├── notebooks/          # Notebooks Jupyter d'exploration
+Projet-Agent-IA-Immo-MCP/
+├── config.py              # Configuration (chemins, BDD, modèle)
+├── config_agent.py        # Configuration LLM (Mistral AI)
+├── pyproject.toml         # Dépendances par groupes (fastapi, mcp, dev)
+├── Makefile               # Commandes courantes
+├── ansible_playbook.yml   # Playbook de déploiement K3S
+├── docker/
+│   ├── Dockerfile.api     # Image FastAPI (multi-stage)
+│   └── Dockerfile.mcp    # Image MCP (multi-stage)
+├── k8s/
+│   ├── fastapi-app.yaml   # Manifest Kubernetes FastAPI
+│   └── mcp-server.yaml   # Manifest Kubernetes MCP
 ├── src/
-│   ├── app/            # Application FastAPI
-│   │   ├── main.py      # Point d'entrée de l'API
-│   │   ├── routes.py    # Routes de l'API
-│   │   └── templates/  # Templates HTML
-│   ├── agents/         # Agent IA et outils
-│   │   ├── agent.py     # Définition de l'agent
-│   │   └── tools/       # Outils de l'agent
-│   └── inference/      # Logique de prédiction
-│       └── model.py    # Modèle d'inférence
-├── scripts/           # Scripts utilitaires
-│   ├── model_training_mlflow.py  # Entraînement du modèle
-│   └── run_api.py      # Lancement de l'API
-├── tests/              # Tests unitaires
-├── pyproject.toml     # Dépendances Python
-└── README.md          # Ce fichier
+│   ├── app/               # Application FastAPI
+│   │   ├── main.py        # Point d'entrée
+│   │   ├── routes.py      # Routes (predict, chat, chatbot)
+│   │   ├── monitoring/    # Métriques Prometheus
+│   │   └── templates/     # Templates HTML (Jinja2)
+│   ├── agents/            # Client et agent MCP (LangChain)
+│   │   ├── clientMCP.py   # Connexion au serveur MCP
+│   │   └── agentMCP.py    # Création de l'agent
+│   ├── mcp/               # Serveur MCP
+│   │   ├── serverMCP.py   # Point d'entrée FastMCP
+│   │   └── tools/         # Outils (geocoding, transactions, estimation, commune)
+│   ├── inference/         # Logique de prédiction (model.py)
+│   └── utils/             # Utilitaires (geo, chargement modèles)
+├── scripts/               # Scripts (entraînement, nettoyage, déploiement)
+├── notebooks/             # Notebooks d'exploration (Marimo)
+├── tests/                 # Tests unitaires et d'intégration
+├── monitoring/            # Dashboard Grafana
+├── docs/                  # Documentation (benchmark, note de cadrage)
+├── data/                  # Données (DVF, BPE INSEE DuckDB)
+├── model/                 # Modèles entraînés
+└── .github/workflows/     # CI/CD (tests, build, deploy)
 ```
+
+## Données
+
+Le projet utilise deux sources de données principales :
+
+1. **Données DVF** (API DVF+ Cerema) : Transactions immobilières des 5 dernières années, interrogées en temps réel via l'API avec pagination asynchrone et cache disque (TTL 30 jours).
+
+2. **Base Permanente des Équipements (BPE INSEE)** : Équipements par commune (écoles, commerces, infrastructures), stockés localement dans une base DuckDB.
+
+Sources :
+- [API Cerema DVF](https://www.data.gouv.fr/fr/datasets/demandes-de-valeurs-foncieres/)
+- [BPE INSEE](https://www.insee.fr/fr/metadonnees/source/operation/s2216/presentation)
 
 ## Flux de Prédiction
 
 ```mermaid
 sequenceDiagram
     participant U as Utilisateur
-    participant A as API
-    participant M as Modèle
-    participant G as Geocoding
-    
-    U->>A: Soumet formulaire
-    A->>G: Valide adresse
-    G-->>A: Retourne coordonnées
-    A->>M: Prépare données
-    M-->>A: Retourne prédiction
-    A-->>U: Affiche résultat
+    participant FA as FastAPI
+    participant MCP as Serveur MCP
+    participant GEO as Geocoding API
+    participant M as Modèle ML
+
+    U->>FA: Soumet formulaire
+    FA->>MCP: estimation_tools(address, type, surface, ...)
+    MCP->>GEO: Géocode l'adresse
+    GEO-->>MCP: Coordonnées + code INSEE
+    MCP->>M: Prédiction
+    M-->>MCP: Prix estimé
+    MCP-->>FA: Résultat structuré
+    FA-->>U: Affiche la prédiction
 ```
 
 ## Flux du Chatbot
@@ -156,58 +222,35 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant U as Utilisateur
-    participant A as API
-    participant C as Chatbot
-    participant T as Outils
-    
-    U->>A: Envoie message
-    A->>C: Transmet message
-    C->>T: Appelle outil approprié
-    
-    T-->>C: Retourne données
-    Note over C,T: ...
-    C-->>A: Génère réponse
-    A-->>U: Affiche réponse
+    participant FA as FastAPI
+    participant Agent as Agent LangChain
+    participant LLM as Mistral AI
+    participant MCP as Serveur MCP
+
+    U->>FA: Envoie message
+    FA->>Agent: Transmet message
+    Agent->>LLM: Analyse la requête
+    LLM-->>Agent: Choix d'outil
+    Agent->>MCP: Appelle l'outil MCP
+    MCP-->>Agent: Résultat
+    Agent->>LLM: Génère réponse
+    LLM-->>Agent: Réponse formatée
+    Agent-->>FA: Stream de la réponse
+    FA-->>U: Affiche en temps réel (SSE)
 ```
 
-## Données
-
-Le projet utilise deux sources de données principales :
-
-1. **Données DVF** : Les Demandes de Valeurs Foncières fournies par le gouvernement français via l'API Cerema, qui recensent l'ensemble des ventes immobilières des 5 dernières années. Ces données sont utilisées par les outils de transactions et d'estimation.
-
-2. **Base Permanente des Équipements (BPE)** : Données INSEE sur le dénombrement des équipements par commune (écoles, commerces, infrastructures, etc.). Ces données sont stockées dans une base DuckDB et utilisées par l'outil d'équipements.
-
-Sources :
-- [API Cerema DVF](https://www.data.gouv.fr/fr/datasets/demandes-de-valeurs-foncieres/)
-- [BPE INSEE](https://www.insee.fr/fr/metadonnees/source/operation/s2216/presentation)
-
-## Modèle d'Agent IA
-
-L'agent utilise plusieurs outils spécialisés :
-
-1. **Geocoding** : Conversion d'adresse en coordonnées GPS
-2. **Commune Info** : Récupération d'informations sur les équipements
-3. **Transactions** : Liste des transactions récentes
-4. **Estimation** : Prédiction de prix
-
-Le monitoring se fait avec **LangSmith** via l'interface web suivante : https://eu.smith.langchain.com 
 ## Configuration
 
-Le projet utilise plusieurs fichiers de configuration :
+- `config.py` : Chemins des données, modèle, base DuckDB
+- `config_agent.py` : Configuration du LLM Mistral AI (avec retry et compatibilité MCP)
+- `.env` : Clés API (MISTRAL_API_KEY, LANGSMITH_*)
 
-- `config.py` : Configuration principale
-- `config_agent.py` : Clés API pour les modèles de langage
-- `.env` : Variables d'environnement
+## Monitoring
 
-## Tests
-
-Pour exécuter les tests :
-
-```bash
-make test
-```
+- **Prometheus** : Métriques exposées sur `/metrics` (latence d'inférence)
+- **Grafana** : Dashboard préconfigré dans `monitoring/grafana_dashboard.json`
+- **LangSmith** : Tracing de l'agent IA sur https://eu.smith.langchain.com
 
 ## License
 
-Ce projet est sous license MIT - voir le fichier [LICENSE](LICENSE) pour plus de détails.
+Ce projet est sous licence MIT - voir le fichier [LICENSE](LICENSE) pour plus de détails.
