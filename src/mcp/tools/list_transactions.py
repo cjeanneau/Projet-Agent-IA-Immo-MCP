@@ -124,6 +124,16 @@ async def _fetch_all_pages(code_insee: str, type_bien: str) -> list[dict]:
 async def get_recent_transactions(
     code_insee: str, type_bien: str, top_n: int = 10
 ) -> list[dict]:
+    """Retourne les mutations DVF récentes pour une commune et un type de bien.
+
+    Args:
+        code_insee (str): Code INSEE de la commune.
+        type_bien (str): Type de bien attendu (`maison` ou `appartement`).
+        top_n (int, optional): Nombre maximum de transactions à renvoyer.
+
+    Returns:
+        list[dict]: Transactions filtrées et triées de la plus récente à la plus ancienne.
+    """
     type_bien = "11" if type_bien == "maison" else "12"
     all_features = await _fetch_all_pages(code_insee, type_bien)
     transactions = [f for f in (filter_transaction(f) for f in all_features) if f]

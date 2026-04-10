@@ -1,15 +1,16 @@
 def get_commune_info(con, code_insee):
     """
-    Retourne un dictionnaire des informations d'une commune à partir de son code INSEE.
-    Inclut le nom de la commune et les valeurs de toutes les colonnes.
+    Récupère les indicateurs d'équipements d'une commune depuis DuckDB.
 
     Args:
         con: Connexion DuckDB active.
         code_insee (str): Code INSEE de la commune (ex: "01009").
 
     Returns:
-        dict: Dictionnaire des informations de la commune, incluant le nom et les valeurs par colonne.
-              Retourne un dictionnaire avec une clé "error" si aucune ligne n'est trouvée.
+        dict:
+            - En succès: dictionnaire des informations de commune
+              (nom + volumes d'équipements par catégorie).
+            - En échec: dictionnaire avec la clé `error` si aucune ligne n'est trouvée.
     """
 
     # Exécute la requête et récupère le résultat sous forme de DataFrame
