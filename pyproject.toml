@@ -50,6 +50,7 @@ dev = [
     "marimo>=0.18.4",
     "openpyxl>=3.1.5",
     "langchain-google-genai>=4.2.1",
+    "gitingest",
 ]
 unused = [
     "onnxruntime>=1.23.2",
