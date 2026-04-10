@@ -2,7 +2,10 @@
 name: Build and Push Images
 
 on:
-  push:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Run Tests"]
+    types: [completed]
     branches: [main]
 
 env:
@@ -12,6 +15,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - uses: actions/checkout@v4
