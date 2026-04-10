@@ -52,6 +52,10 @@ metadata:
   namespace: __NAMESPACE__
 spec:
   type: ClusterIP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 600
   selector:
     app: mcp-server
   ports:

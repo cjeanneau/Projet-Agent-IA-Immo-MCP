@@ -3,7 +3,19 @@ from .list_transactions import get_session
 from typing import Any
 
 async def geocoding(address: str) -> dict[str, Any]:
-    """Obtenir les coordonnées géographiques pour une adresse donnée."""
+    """Résout une adresse via l'API Adresse et renvoie ses métadonnées principales.
+
+    Args:
+        address (str): Adresse textuelle à rechercher.
+
+    Returns:
+        dict[str, Any]:
+            - En succès: `adresse`, `code_insee`, `type_voie`, `longitude`, `latitude`.
+            - En échec: dictionnaire avec la clé `error`.
+
+    Raises:
+        ValueError: Si l'adresse fournie est vide ou trop courte.
+    """
     if not address or len(address) < 5:
         raise ValueError("Adresse invalide. Veuillez fournir une adresse complète.")
 

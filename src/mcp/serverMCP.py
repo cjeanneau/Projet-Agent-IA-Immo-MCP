@@ -14,6 +14,8 @@ import asyncio
 from tenacity import retry, stop_after_attempt, wait_exponential_jitter, retry_if_exception
 
 class TypeBien(str, Enum):
+    """Type de bien accepté par les outils de transactions."""
+
     maison = "maison"
     appartement = "appartement"
 
@@ -43,8 +45,16 @@ network_retry = retry(
 @mcp.tool
 @network_retry
 async def geocoding_tools(address: str) -> dict[str, Any]:
-    print(address)
-    """Obtenir les coordonnées géographiques pour une adresse donnée."""
+    """Résout une adresse postale en coordonnées GPS et métadonnées communales.
+
+    Args:
+        address (str): Adresse libre à géocoder (ex: "10 rue de la Paix, Paris").
+
+    Returns:
+        dict[str, Any]:
+            - En succès: `adresse`, `code_insee`, `type_voie`, `longitude`, `latitude`.
+            - En échec: dictionnaire avec la clé `error`.
+    """
     if not address or len(address.strip()) < 2:
         return {"error": "Adresse invalide. Veuillez fournir une adresse plus précise."}
     try:
@@ -59,7 +69,16 @@ async def geocoding_tools(address: str) -> dict[str, Any]:
 
 @mcp.tool
 async def commune_info_tools(code_insee: str) -> dict[str, Any]:
-    """Obtenir les informations sur les nombres d'équipement pour un code INSEE."""
+    """Récupère les indicateurs d'équipements d'une commune via son code INSEE.
+
+    Args:
+        code_insee (str): Code INSEE sur 5 chiffres (ex: "37261").
+
+    Returns:
+        dict[str, Any]:
+            - En succès: informations de la commune (nom, volumes d'équipements par catégorie).
+            - En échec: dictionnaire avec la clé `error`.
+    """
     if not code_insee or not code_insee.strip().isdigit() or len(code_insee.strip()) != 5:
         return {"error": f"Code INSEE invalide: '{code_insee}'. Attendu: 5 chiffres (ex: 37261)."}
     try:
@@ -76,7 +95,18 @@ async def commune_info_tools(code_insee: str) -> dict[str, Any]:
 @mcp.tool
 @network_retry
 async def recent_transactions_tools(code_insee: str, type_bien: TypeBien, n: int = 10) -> dict[str, Any]:
-    """Obtenir les informations sur les 10 transactions les plus récentes pour un code INSEE."""
+    """Liste les transactions DVF les plus récentes d'une commune pour un type de bien.
+
+    Args:
+        code_insee (str): Code INSEE de la commune (5 chiffres).
+        type_bien (TypeBien): `maison` ou `appartement`.
+        n (int, optional): Nombre de résultats souhaités. Borné automatiquement entre 1 et 50.
+
+    Returns:
+        dict[str, Any]:
+            - En succès: `{"transactions": [...]}` avec les mutations triées par date décroissante.
+            - En échec: dictionnaire avec la clé `error`.
+    """
     if not code_insee or not code_insee.strip().isdigit() or len(code_insee.strip()) != 5:
         return {"error": f"Code INSEE invalide: '{code_insee}'. Attendu: 5 chiffres (ex: 37261)."}
     if n < 1 or n > 50:
@@ -103,7 +133,20 @@ async def estimation_tools(
     surface_terrain: float,
     nombre_pieces: int,
 ) :
-    """Obtenir une estimation sur le prix de vente d'une maison ou d'un appartement située à une adresse."""
+    """Estime le prix de vente d'un bien à partir de son adresse et de ses caractéristiques.
+
+    Args:
+        address (str): Adresse complète du bien.
+        type_local (str): Type de local attendu par le modèle (ex: "Maison", "Appartement").
+        surface_habitable (float): Surface habitable en m2 (strictement positive).
+        surface_terrain (float): Surface de terrain en m2 (0 possible pour un appartement).
+        nombre_pieces (int): Nombre de pièces (minimum 1).
+
+    Returns:
+        dict[str, Any]:
+            - En succès: estimation et variables explicatives renvoyées par le moteur de prédiction.
+            - En échec: dictionnaire avec la clé `error`.
+    """
     # Validation des inputs
     if surface_habitable <= 0:
         return {"error": "La surface habitable doit être supérieure à 0."}
@@ -117,52 +160,3 @@ async def estimation_tools(
         return result
     except Exception as e:
         return {"error": f"Estimation échouée: {type(e).__name__}: {e}"}
-
-'''@mcp.tool
-async def geocoding_tools(address: str) -> dict[str, float]:
-    """Obtenir les coordonnées géographiques pour une adresse donnée."""
-    return await geocoding(address)
-'''
-
-'''@mcp.tool
-async def commune_info_tools(code_insee: str) -> dict[str, Any]:
-    """Obtenir les informations sur les nombres d'équipement pour un code INSEE."""
-    print(code_insee)
-    
-    if not code_insee or not code_insee.strip().isdigit() or len(code_insee.strip()) != 5:
-        return {"error": f"Code INSEE invalide: '{code_insee}'. Attendu: 5 chiffres (ex: 37261)."}
-    try:
-        result = get_commune_info(con, code_insee=code_insee)
-        if not result:
-            return {"error": f"Aucune donnée trouvée pour le code INSEE {code_insee}."}
-        return result
-    except duckdb.Error as e:
-        return {"error": f"Erreur base de données: {e}"}
-    except Exception as e:
-        return {"error": f"Commune info échoué: {type(e).__name__}: {e}"}
-'''
-
-
-'''
-@mcp.tool
-async def recent_transactions_tools(code_insee: str, type_bien: TypeBien, n: int = 10) -> dict[str, float]:
-    """Obtenir les transactions récentes pour un code INSEE et type de bien."""
-    return await get_recent_transactions(code_insee=code_insee, type_bien=type_bien, top_n=n)
-
-@mcp.tool
-async def estimation_tools(
-    address: str,
-    type_local: str,
-    surface_habitable: float,
-    surface_terrain: float,
-    nombre_pieces: int,
-) -> dict[str, float]:
-    """Estimer le prix d'un bien immobilier en fonction de ses caractéristiques."""
-    return estimate_price(
-        address=address,
-        type_local=type_local,
-        surface_habitable=surface_habitable,
-        surface_terrain=surface_terrain,
-        nombre_pieces=nombre_pieces,
-    )
-'''

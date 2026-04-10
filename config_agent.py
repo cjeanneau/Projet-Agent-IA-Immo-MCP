@@ -1,7 +1,6 @@
 from dotenv import load_dotenv
 import os
 from langchain_mistralai import ChatMistralAI
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import ToolMessage
 
 load_dotenv(override=True)
@@ -47,14 +46,6 @@ api_key_mistral = os.getenv("MISTRAL_API_KEY")
 if not api_key_mistral: 
     raise ValueError("Clé API Mistral manquante. Veuillez définir la variable d'environnement MISTRAL_API_KEY.")
 
-api_key_gemini = os.getenv("GEMINI_API_KEY")
-if not api_key_gemini:
-    raise ValueError("Clé API Gemini manquante. Veuillez définir la variable d'environnement GEMINI_API_KEY.")
-
-#llm_mistral = ChatMistralAI(model="mistral-small-2503", api_key=api_key_mistral, temperature=0)
-
 llm_mistral = MistralMCPCompat(model="mistral-small-2503", api_key=api_key_mistral, temperature=0)
-
-llm_gemini = ChatGoogleGenerativeAI(model="gemini-2.5-flash", api_key=api_key_gemini, temperature=0)
 
 MCP_URL = os.getenv('MCP_URL', "http://localhost:8100/mcp")
