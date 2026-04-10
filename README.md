@@ -21,29 +21,26 @@ Ce projet met à disposition une application permettant d'estimer le prix d'un b
 Le projet suit une architecture microservices avec deux applications distinctes :
 
 ```mermaid
-graph TD
-    U[Utilisateur] -->|Interface Web / API| FA
+graph LR
+    U[Utilisateur] -->|Web / API| FA
 
     subgraph K3S["K3S Cluster — namespace p4g1"]
-        subgraph POD_API["Pod FastAPI (Dockerfile.api)"]
+        direction LR
+        subgraph POD_API["Pod FastAPI"]
             FA[FastAPI :8000]
-            AGENT[Agent LangChain]
         end
-        subgraph POD_MCP["Pod MCP Server (Dockerfile.mcp)"]
-            MCP[Serveur MCP :8100]
-            MODEL[Modèle ML XGBoost]
-            DB[(DuckDB BPE INSEE)]
+        subgraph POD_MCP["Pod MCP Server"]
+            MCP[MCP :8100]
         end
+        FA -->|MCP Protocol| MCP
     end
 
-    FA -->|LangChain| AGENT
-    AGENT -->|MCP Protocol HTTP| MCP
-    FA -.->|Mistral AI API| LLM[Mistral AI]
-    MCP -->|geocoding_tools| GEO[geo.api.gouv.fr]
-    MCP -->|recent_transactions_tools| DVF[API DVF+ Cerema]
-    MCP -->|estimation_tools| MODEL
-    MCP -->|commune_info_tools| DB
-    DVF -->|cache| CACHE[diskcache 30j]
+    FA -.->|API| LLM[Mistral AI]
+
+    MCP --> GEO[geo.api.gouv.fr]
+    MCP --> DVF[API DVF+ Cerema]
+    MCP --> MODEL[XGBoost]
+    MCP --> DB[(DuckDB)]
 ```
 
 ### Applications
@@ -185,24 +182,12 @@ flowchart TD
 Déclenché automatiquement après un build réussi ou manuellement via `workflow_dispatch`. Se connecte au serveur de production en SSH et exécute un playbook Ansible.
 
 ```mermaid
-flowchart TD
-    Trigger["Build réussi\nou workflow_dispatch"] --> Checkout["Checkout du code"]
-    Checkout --> Ansible["Install Ansible"]
-    Ansible --> SSH["Setup clé SSH"]
-    SSH --> Inventory["Création inventaire"]
-    Inventory --> Copy["Copie des manifests K8S\nvers le serveur"]
-    Copy --> Playbook["Exécution du playbook Ansible"]
-
-    subgraph Playbook Ansible sur le serveur
-        direction TB
-        NS["Création namespace p4g1"]
-        NS --> Secret1["Création secret GHCR\n(pull des images privées)"]
-        Secret1 --> Secret2["Création secret API keys\n(Mistral, Gemini, LangSmith)"]
-        Secret2 --> Patch["Patch service account\navec le pull secret"]
-        Patch --> ApplyMCP["kubectl apply mcp-server.yaml\n(sed remplace les placeholders:\nimage, namespace, volumes)"]
-        ApplyMCP --> ApplyAPI["kubectl apply fastapi-app.yaml\n(sed remplace les placeholders:\nimage, namespace, nodePort)"]
-        ApplyAPI --> Restart["Rollout restart\ndes deux deployments"]
-    end
+flowchart LR
+    Trigger["Build réussi\nou workflow_dispatch"] --> SSH["Connexion SSH\nau serveur"]
+    SSH --> Playbook["Ansible Playbook"]
+    Playbook --> Secrets["Secrets K8S\n(GHCR + API keys)"]
+    Secrets --> Apply["kubectl apply\n(manifests K8S)"]
+    Apply --> Restart["Rollout restart"]
 ```
 
 Le playbook Ansible (`ansible_playbook.yml`) gère l'intégralité de la configuration K3S sur le serveur distant :
