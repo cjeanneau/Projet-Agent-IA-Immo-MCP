@@ -3,10 +3,10 @@ import duckdb
 from config import BPE_INSEE_DB
 from enum import Enum
 from typing import Any
-from src.agents.tools.geocoding import geocoding
-from src.agents.tools.commune_info import get_commune_info
-from src.agents.tools.list_transactions import get_recent_transactions
-from src.agents.tools.do_prediction import estimate_price
+from .tools.geocoding import geocoding
+from .tools.commune_info import get_commune_info
+from .tools.list_transactions import get_recent_transactions
+from .tools.do_prediction import estimate_price
 
 import aiohttp
 import asyncio
