@@ -21,26 +21,31 @@ Ce projet met à disposition une application permettant d'estimer le prix d'un b
 Le projet suit une architecture microservices avec deux applications distinctes :
 
 ```mermaid
-graph LR
-    U[Utilisateur] -->|Web / API| FA
+graph TB
+    U[Utilisateur]
+    LLM[Mistral AI]
+    GEO[geo.api.gouv.fr]
+    DVF[API DVF+ Cerema]
+
+    U -->|Web / API| FA
 
     subgraph K3S["K3S Cluster — namespace p4g1"]
-        direction LR
-        subgraph POD_API["Pod FastAPI"]
-            FA[FastAPI :8000]
+        subgraph POD_API["Pod FastAPI :8000"]
+            FA[FastAPI + Agent LangChain]
         end
-        subgraph POD_MCP["Pod MCP Server"]
-            MCP[MCP :8100]
+        subgraph POD_MCP["Pod MCP Server :8100"]
+            MCP[FastMCP]
+            MODEL[XGBoost]
+            DB[(DuckDB)]
+            MCP --- MODEL
+            MCP --- DB
         end
-        FA -->|MCP Protocol| MCP
+        FA -- MCP Protocol --> MCP
     end
 
-    FA -.->|API| LLM[Mistral AI]
-
-    MCP --> GEO[geo.api.gouv.fr]
-    MCP --> DVF[API DVF+ Cerema]
-    MCP --> MODEL[XGBoost]
-    MCP --> DB[(DuckDB)]
+    FA -. API .-> LLM
+    MCP --> GEO
+    MCP --> DVF
 ```
 
 ### Applications
@@ -150,45 +155,29 @@ make k3s-install
 
 Le déploiement en production est entièrement automatisé via GitHub Actions et se décompose en trois workflows :
 
+Le pipeline CI/CD complet est le suivant :
+
+```mermaid
+flowchart LR
+    Push["Push"] --> Tests["Tests"]
+    Tests -->|main uniquement\nsi tests OK| Build["Build & Push\nImages GHCR"]
+    Build -->|si build OK| Deploy["Deploy K3S\nvia Ansible"]
+
+    Manual1["workflow_dispatch"] -.-> Build
+    Manual2["workflow_dispatch"] -.-> Deploy
+```
+
 #### 1. Tests (`tests.yml`)
 
 Exécuté sur chaque push sur `main` et `staging`.
 
-```mermaid
-flowchart LR
-    Push["Push main / staging"] --> Checkout
-    Checkout --> Python["Setup Python 3.12"]
-    Python --> UV["Install uv"]
-    UV --> Deps["uv sync --all-extras"]
-    Deps --> Tests["pytest"]
-```
-
 #### 2. Build (`build.yml`)
 
-Exécuté sur chaque push sur `main`. Construit les images Docker et les pousse sur GitHub Container Registry (GHCR).
-
-```mermaid
-flowchart TD
-    Push["Push sur main"] --> Checkout["Checkout du code"]
-    Checkout --> Login["Login GHCR"]
-    Login --> BuildMCP["Build Dockerfile.mcp"]
-    Login --> BuildAPI["Build Dockerfile.api"]
-    BuildMCP --> PushMCP["Push ghcr.io/.../mcp-server:latest\nghcr.io/.../mcp-server:sha"]
-    BuildAPI --> PushAPI["Push ghcr.io/.../fastapi-app:latest\nghcr.io/.../fastapi-app:sha"]
-```
+Déclenché automatiquement après des tests réussis sur `main`, ou manuellement via `workflow_dispatch`. Construit les deux images Docker et les pousse sur GHCR.
 
 #### 3. Deploy (`deploy.yml`)
 
-Déclenché automatiquement après un build réussi ou manuellement via `workflow_dispatch`. Se connecte au serveur de production en SSH et exécute un playbook Ansible.
-
-```mermaid
-flowchart LR
-    Trigger["Build réussi\nou workflow_dispatch"] --> SSH["Connexion SSH\nau serveur"]
-    SSH --> Playbook["Ansible Playbook"]
-    Playbook --> Secrets["Secrets K8S\n(GHCR + API keys)"]
-    Secrets --> Apply["kubectl apply\n(manifests K8S)"]
-    Apply --> Restart["Rollout restart"]
-```
+Déclenché automatiquement après un build réussi, ou manuellement via `workflow_dispatch`. Se connecte au serveur de production en SSH et exécute le playbook Ansible (secrets K8S, apply manifests, rollout restart).
 
 Le playbook Ansible (`ansible_playbook.yml`) gère l'intégralité de la configuration K3S sur le serveur distant :
 - Création du namespace `p4g1`
