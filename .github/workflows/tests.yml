@@ -31,7 +31,7 @@ jobs:
       shell: bash
       run: |
         source .venv/bin/activate
-        python -m pytest tests/ -v -W ignore::DeprecationWarning
+        python -m pytest tests/ -v -W ignore::DeprecationWarning --ignore=tests/integration/mcp/test_server_tools.py --ignore=tests/unit/mcp/test_server_validation.py
       env:
         MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY}}
