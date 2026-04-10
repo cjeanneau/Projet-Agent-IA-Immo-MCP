@@ -1,5 +1,5 @@
 import aiohttp
-from src.agents.tools.list_transactions import get_session
+from .list_transactions import get_session
 from typing import Any
 
 async def geocoding(address: str) -> dict[str, Any]:
