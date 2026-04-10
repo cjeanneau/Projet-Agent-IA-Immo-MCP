@@ -1,37 +1,38 @@
+# === Build stage: install dependencies with uv ===
+FROM python:3.12-slim AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+COPY config_agent.py ./
+COPY src/app/ ./src/app/
+COPY src/agents/ ./src/agents/
+
+RUN uv sync --no-dev --group fastapi --no-cache \
+    && find /app/.venv -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null; \
+    find /app/.venv -type d -name 'tests' -o -type d -name 'test' | xargs rm -rf 2>/dev/null; \
+    true
+
+# === Runtime stage: clean image without uv ===
 FROM python:3.12-slim
 
-# Install uv and curl (required for healthcheck)
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy dependency files first
-COPY pyproject.toml uv.lock ./
-
-RUN apt-get update && apt-get install -y \
-    curl \
-    ca-certificates \
-    && update-ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install dependencies directly to system Python (faster and simpler)
-RUN uv pip install --system --no-cache .
-
-# Copy application code
-COPY config.py ./
-COPY config_agent.py ./
-#COPY data/bpe_insee.duckdb ./data/bpe_insee.duckdb
-COPY src/ ./src/
-
-# Copy model files
-#COPY ./model/ ./model
+# Copy venv and application code from builder
+COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder /app/config_agent.py ./
+COPY --from=builder /app/src/ ./src/
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
 ENV PYTHONUNBUFFERED=1
+ENV PATH="/app/.venv/bin:$PATH"
 
 EXPOSE 8000
 
