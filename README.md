@@ -25,25 +25,27 @@ graph TB
     U[Utilisateur]
     LLM[Mistral AI]
     GEO[geo.api.gouv.fr]
-    DVF[API DVF+ Cerema]
+    DVF[API Cerema DVF]
 
-    U -->|Web / API| FA
+    U --> FA
 
-    subgraph K3S["K3S Cluster — namespace p4g1"]
-        subgraph POD_API["Pod FastAPI :8000"]
-            FA[FastAPI + Agent LangChain]
+    subgraph K3S[K3S Cluster]
+        subgraph POD_API[Pod FastAPI]
+            FA[FastAPI]
+            AGENT[Agent LangChain]
         end
-        subgraph POD_MCP["Pod MCP Server :8100"]
+        subgraph POD_MCP[Pod MCP Server]
             MCP[FastMCP]
             MODEL[XGBoost]
             DB[(DuckDB)]
-            MCP --- MODEL
-            MCP --- DB
         end
-        FA -- MCP Protocol --> MCP
+        FA --> AGENT
+        AGENT -->|MCP Protocol| MCP
+        MCP --> MODEL
+        MCP --> DB
     end
 
-    FA -. API .-> LLM
+    AGENT -.-> LLM
     MCP --> GEO
     MCP --> DVF
 ```
@@ -159,12 +161,11 @@ Le pipeline CI/CD complet est le suivant :
 
 ```mermaid
 flowchart LR
-    Push["Push"] --> Tests["Tests"]
-    Tests -->|main uniquement\nsi tests OK| Build["Build & Push\nImages GHCR"]
-    Build -->|si build OK| Deploy["Deploy K3S\nvia Ansible"]
-
-    Manual1["workflow_dispatch"] -.-> Build
-    Manual2["workflow_dispatch"] -.-> Deploy
+    Push[Push] --> Tests[Tests]
+    Tests -->|main + tests OK| Build[Build et Push GHCR]
+    Build -->|build OK| Deploy[Deploy K3S]
+    Manual1[workflow_dispatch] -.-> Build
+    Manual2[workflow_dispatch] -.-> Deploy
 ```
 
 #### 1. Tests (`tests.yml`)
@@ -244,16 +245,16 @@ sequenceDiagram
     participant FA as FastAPI
     participant MCP as Serveur MCP
     participant GEO as Geocoding API
-    participant M as Modèle ML
+    participant M as Modele ML
 
     U->>FA: Soumet formulaire
-    FA->>MCP: estimation_tools(address, type, surface, ...)
-    MCP->>GEO: Géocode l'adresse
-    GEO-->>MCP: Coordonnées + code INSEE
-    MCP->>M: Prédiction
-    M-->>MCP: Prix estimé
-    MCP-->>FA: Résultat structuré
-    FA-->>U: Affiche la prédiction
+    FA->>MCP: estimation_tools
+    MCP->>GEO: Geocode adresse
+    GEO-->>MCP: Coordonnees + code INSEE
+    MCP->>M: Prediction
+    M-->>MCP: Prix estime
+    MCP-->>FA: Resultat structure
+    FA-->>U: Affiche la prediction
 ```
 
 ## Flux du Chatbot
@@ -268,14 +269,14 @@ sequenceDiagram
 
     U->>FA: Envoie message
     FA->>Agent: Transmet message
-    Agent->>LLM: Analyse la requête
-    LLM-->>Agent: Choix d'outil
-    Agent->>MCP: Appelle l'outil MCP
-    MCP-->>Agent: Résultat
-    Agent->>LLM: Génère réponse
-    LLM-->>Agent: Réponse formatée
-    Agent-->>FA: Stream de la réponse
-    FA-->>U: Affiche en temps réel (SSE)
+    Agent->>LLM: Analyse la requete
+    LLM-->>Agent: Choix outil
+    Agent->>MCP: Appelle outil MCP
+    MCP-->>Agent: Resultat
+    Agent->>LLM: Genere reponse
+    LLM-->>Agent: Reponse formatee
+    Agent-->>FA: Stream de la reponse
+    FA-->>U: Affiche en temps reel SSE
 ```
 
 ## Configuration
