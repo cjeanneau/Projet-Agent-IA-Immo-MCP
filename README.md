@@ -22,13 +22,27 @@ Le projet suit une architecture microservices avec deux applications distinctes 
 
 ```mermaid
 graph TD
-    U[Utilisateur] -->|Interface Web / API| FA[FastAPI :8000]
-    FA -->|MCP Protocol| MCP[Serveur MCP :8100]
-    FA -->|LangChain Agent| LLM[Mistral AI]
+    U[Utilisateur] -->|Interface Web / API| FA
+
+    subgraph K3S["K3S Cluster — namespace p4g1"]
+        subgraph POD_API["Pod FastAPI (Dockerfile.api)"]
+            FA[FastAPI :8000]
+            AGENT[Agent LangChain]
+        end
+        subgraph POD_MCP["Pod MCP Server (Dockerfile.mcp)"]
+            MCP[Serveur MCP :8100]
+            MODEL[Modèle ML XGBoost]
+            DB[(DuckDB BPE INSEE)]
+        end
+    end
+
+    FA -->|LangChain| AGENT
+    AGENT -->|MCP Protocol HTTP| MCP
+    FA -.->|Mistral AI API| LLM[Mistral AI]
     MCP -->|geocoding_tools| GEO[geo.api.gouv.fr]
     MCP -->|recent_transactions_tools| DVF[API DVF+ Cerema]
-    MCP -->|estimation_tools| MODEL[Modèle ML XGBoost]
-    MCP -->|commune_info_tools| DB[(DuckDB BPE INSEE)]
+    MCP -->|estimation_tools| MODEL
+    MCP -->|commune_info_tools| DB
     DVF -->|cache| CACHE[diskcache 30j]
 ```
 
@@ -115,7 +129,7 @@ make coverage-report
 
 ### Docker
 
-Les Dockerfiles utilisent des builds multi-stage et des groupes de dépendances uv pour des images optimisées :
+Les Dockerfiles utilisent des builds multi-stage et des groupes de dépendances uv pour des images optimisées. Le stage `builder` installe les dépendances avec uv, puis le stage final copie uniquement le venv et le code applicatif (sans uv ni outils de build).
 
 ```bash
 # Construire les images
@@ -127,24 +141,75 @@ make run         # Lance FastAPI
 make run-mcp     # Lance MCP
 ```
 
-### K3S (Kubernetes)
+### K3S local
+
+Pour déployer localement sur un cluster K3S :
 
 ```bash
-# Importer les images dans k3s
-make k3s
-
-# Créer les secrets
-make k3s-secrets
-
-# Déployer les manifests
-make deploy
+make k3s-install
 ```
 
-### CI/CD (GitHub Actions)
+### Déploiement en production (CI/CD)
 
-- **tests.yml** : Tests automatiques sur push `main` et `staging`
-- **build.yml** : Build et push des images Docker vers GHCR sur push `main`
-- **deploy.yml** : Déploiement automatique sur K3S via Ansible après un build réussi
+Le déploiement en production est entièrement automatisé via GitHub Actions et se décompose en trois workflows :
+
+#### 1. Tests (`tests.yml`)
+
+Exécuté sur chaque push sur `main` et `staging`.
+
+```mermaid
+flowchart LR
+    Push["Push main / staging"] --> Checkout
+    Checkout --> Python["Setup Python 3.12"]
+    Python --> UV["Install uv"]
+    UV --> Deps["uv sync --all-extras"]
+    Deps --> Tests["pytest"]
+```
+
+#### 2. Build (`build.yml`)
+
+Exécuté sur chaque push sur `main`. Construit les images Docker et les pousse sur GitHub Container Registry (GHCR).
+
+```mermaid
+flowchart TD
+    Push["Push sur main"] --> Checkout["Checkout du code"]
+    Checkout --> Login["Login GHCR"]
+    Login --> BuildMCP["Build Dockerfile.mcp"]
+    Login --> BuildAPI["Build Dockerfile.api"]
+    BuildMCP --> PushMCP["Push ghcr.io/.../mcp-server:latest\nghcr.io/.../mcp-server:sha"]
+    BuildAPI --> PushAPI["Push ghcr.io/.../fastapi-app:latest\nghcr.io/.../fastapi-app:sha"]
+```
+
+#### 3. Deploy (`deploy.yml`)
+
+Déclenché automatiquement après un build réussi ou manuellement via `workflow_dispatch`. Se connecte au serveur de production en SSH et exécute un playbook Ansible.
+
+```mermaid
+flowchart TD
+    Trigger["Build réussi\nou workflow_dispatch"] --> Checkout["Checkout du code"]
+    Checkout --> Ansible["Install Ansible"]
+    Ansible --> SSH["Setup clé SSH"]
+    SSH --> Inventory["Création inventaire"]
+    Inventory --> Copy["Copie des manifests K8S\nvers le serveur"]
+    Copy --> Playbook["Exécution du playbook Ansible"]
+
+    subgraph Playbook Ansible sur le serveur
+        direction TB
+        NS["Création namespace p4g1"]
+        NS --> Secret1["Création secret GHCR\n(pull des images privées)"]
+        Secret1 --> Secret2["Création secret API keys\n(Mistral, Gemini, LangSmith)"]
+        Secret2 --> Patch["Patch service account\navec le pull secret"]
+        Patch --> ApplyMCP["kubectl apply mcp-server.yaml\n(sed remplace les placeholders:\nimage, namespace, volumes)"]
+        ApplyMCP --> ApplyAPI["kubectl apply fastapi-app.yaml\n(sed remplace les placeholders:\nimage, namespace, nodePort)"]
+        ApplyAPI --> Restart["Rollout restart\ndes deux deployments"]
+    end
+```
+
+Le playbook Ansible (`ansible_playbook.yml`) gère l'intégralité de la configuration K3S sur le serveur distant :
+- Création du namespace `p4g1`
+- Gestion des secrets Kubernetes (credentials GHCR pour le pull des images, clés API pour les services)
+- Application des manifests K8S avec substitution dynamique des variables (image, namespace, politique de pull, volumes)
+- Redémarrage des deployments pour prendre en compte les nouvelles images
 
 ## Structure du projet
 
